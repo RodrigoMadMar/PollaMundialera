@@ -10,7 +10,8 @@ async function fetchAPI(path: string) {
   });
 
   if (!res.ok) {
-    throw new Error(`Football Data API error: ${res.status} ${res.statusText}`);
+    const body = await res.text();
+    throw new Error(`Football Data API error: ${res.status} — ${body}`);
   }
 
   return res.json();
@@ -28,23 +29,21 @@ export interface APIMatch {
   };
 }
 
-const WC_SEASON = "2026";
-
 export async function getWorldCupMatches(): Promise<APIMatch[]> {
-  const data = await fetchAPI(`/competitions/${COMPETITION}/matches?season=${WC_SEASON}`);
+  const data = await fetchAPI(`/competitions/${COMPETITION}/matches`);
   return data.matches ?? [];
 }
 
 export async function getUpcomingMatches(): Promise<APIMatch[]> {
   const data = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?season=${WC_SEASON}&status=SCHEDULED,TIMED`
+    `/competitions/${COMPETITION}/matches?status=SCHEDULED,TIMED`
   );
   return data.matches ?? [];
 }
 
 export async function getFinishedMatches(): Promise<APIMatch[]> {
   const data = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?season=${WC_SEASON}&status=FINISHED`
+    `/competitions/${COMPETITION}/matches?status=FINISHED`
   );
   return data.matches ?? [];
 }
@@ -56,7 +55,12 @@ export async function syncMatches() {
 
   const apiMatches = await getWorldCupMatches();
 
-  for (const m of apiMatches) {
+  // Only sync matches from 2026 onwards (filter out old World Cup editions)
+  const wc2026 = apiMatches.filter(
+    (m) => new Date(m.utcDate).getFullYear() >= 2026
+  );
+
+  for (const m of wc2026) {
     const kickoff = new Date(m.utcDate);
     const homeScore = m.score.fullTime.home;
     const awayScore = m.score.fullTime.away;
@@ -93,5 +97,5 @@ export async function syncMatches() {
     }
   }
 
-  return { synced: apiMatches.length };
+  return { total: apiMatches.length, synced: wc2026.length };
 }

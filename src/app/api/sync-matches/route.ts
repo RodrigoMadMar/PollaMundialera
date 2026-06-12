@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
 
   try {
     // Remove old WC matches (pre-2026) that may have been synced previously.
-    // Demo matches use external_id >= 9000000 so we keep those.
     const sql = neon(process.env.DATABASE_URL!);
     await sql`
       DELETE FROM predictions
@@ -26,17 +25,22 @@ export async function GET(request: NextRequest) {
           AND kickoff < '2026-01-01'
       )
     `;
-    await sql`
+    const deleted = await sql`
       DELETE FROM matches
       WHERE external_id < 9000000
         AND kickoff < '2026-01-01'
+      RETURNING id
     `;
 
     const result = await syncMatches();
     revalidatePath("/");
     revalidatePath("/api/matches");
     revalidatePath("/api/leaderboard");
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({
+      ok: true,
+      deletedOldMatches: deleted.length,
+      ...result,
+    });
   } catch (error) {
     console.error("Sync error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
