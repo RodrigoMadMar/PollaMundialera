@@ -1,83 +1,123 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users, matches, predictions } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { neon } from "@neondatabase/serverless";
 
 export const dynamic = "force-dynamic";
 
-const USERS = [
-  { name: "Rodrigo", email: "rodrigo.madariaga@alumni.ie.edu" },
-  { name: "Benito", email: "jbmartinez93@hotmail.com" },
-  { name: "Daniel", email: "danbrionesr@gmail.com" },
-  { name: "MRB", email: "marpandres1994@gmail.com" },
-  { name: "Charlie", email: "carlos.rodriguezp@mail.udp.cl" },
-];
-
 export async function GET() {
   try {
+    const sql = neon(process.env.DATABASE_URL!);
+
+    // Ensure schema is correct (idempotent)
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS matches (
+        id SERIAL PRIMARY KEY,
+        external_id INTEGER UNIQUE,
+        home_team TEXT NOT NULL,
+        away_team TEXT NOT NULL,
+        kickoff TIMESTAMP NOT NULL,
+        home_score INTEGER,
+        away_score INTEGER,
+        status TEXT DEFAULT 'SCHEDULED',
+        finished BOOLEAN DEFAULT FALSE,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS predictions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        match_id INTEGER REFERENCES matches(id),
+        predicted_home INTEGER,
+        predicted_away INTEGER,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, match_id)
+      )
+    `;
+
     // Seed users
-    for (const user of USERS) {
-      const existing = await db.select().from(users).where(eq(users.email, user.email)).limit(1);
-      if (existing.length === 0) {
-        await db.insert(users).values(user);
-      }
+    const userRows = [
+      { name: "Rodrigo", email: "rodrigo.madariaga@alumni.ie.edu" },
+      { name: "Benito",  email: "jbmartinez93@hotmail.com" },
+      { name: "Daniel",  email: "danbrionesr@gmail.com" },
+      { name: "MRB",     email: "marpandres1994@gmail.com" },
+      { name: "Charlie", email: "carlos.rodriguezp@mail.udp.cl" },
+    ];
+
+    for (const u of userRows) {
+      await sql`
+        INSERT INTO users (name, email) VALUES (${u.name}, ${u.email})
+        ON CONFLICT (email) DO NOTHING
+      `;
     }
 
-    // Demo matches
+    // Seed demo matches
     const now = new Date();
-    const past = (h: number) => new Date(now.getTime() - h * 3600 * 1000);
-    const future = (h: number) => new Date(now.getTime() + h * 3600 * 1000);
+    const past  = (h: number) => new Date(now.getTime() - h * 3600000).toISOString();
+    const future = (h: number) => new Date(now.getTime() + h * 3600000).toISOString();
 
     const demoMatches = [
-      { externalId: 9000001, homeTeam: "Argentina", awayTeam: "Francia", kickoff: past(50), homeScore: 3, awayScore: 3, status: "FINISHED", finished: true },
-      { externalId: 9000002, homeTeam: "Brasil", awayTeam: "Alemania", kickoff: past(26), homeScore: 2, awayScore: 1, status: "FINISHED", finished: true },
-      { externalId: 9000003, homeTeam: "España", awayTeam: "Portugal", kickoff: future(3), homeScore: null, awayScore: null, status: "SCHEDULED", finished: false },
-      { externalId: 9000004, homeTeam: "Inglaterra", awayTeam: "Italia", kickoff: future(27), homeScore: null, awayScore: null, status: "SCHEDULED", finished: false },
+      { eid: 9000001, home: "Argentina", away: "Francia",   kick: past(50),   hs: 3,    as_: 3,    st: "FINISHED", fin: true  },
+      { eid: 9000002, home: "Brasil",    away: "Alemania",  kick: past(26),   hs: 2,    as_: 1,    st: "FINISHED", fin: true  },
+      { eid: 9000003, home: "España",    away: "Portugal",  kick: future(3),  hs: null, as_: null, st: "SCHEDULED", fin: false },
+      { eid: 9000004, home: "Inglaterra",away: "Italia",    kick: future(27), hs: null, as_: null, st: "SCHEDULED", fin: false },
     ];
 
     for (const m of demoMatches) {
-      const existing = await db.select().from(matches).where(eq(matches.externalId, m.externalId)).limit(1);
-      if (existing.length === 0) {
-        await db.insert(matches).values(m);
-      }
+      await sql`
+        INSERT INTO matches (external_id, home_team, away_team, kickoff, home_score, away_score, status, finished)
+        VALUES (${m.eid}, ${m.home}, ${m.away}, ${m.kick}, ${m.hs}, ${m.as_}, ${m.st}, ${m.fin})
+        ON CONFLICT (external_id) DO UPDATE SET
+          home_score = EXCLUDED.home_score,
+          away_score = EXCLUDED.away_score,
+          status = EXCLUDED.status,
+          finished = EXCLUDED.finished,
+          updated_at = NOW()
+      `;
     }
 
-    // Load inserted users and matches
-    const allUsers = await db.select().from(users);
-    const allMatches = await db.select().from(matches);
-
-    const findUser = (name: string) => allUsers.find((u) => u.name === name);
-    const findMatch = (extId: number) => allMatches.find((m) => m.externalId === extId);
-
-    // Demo predictions → Benito 5pts, Charlie 5pts, Rodrigo 3pts, Daniel 0pts, MRB 0pts
-    const demoPredictions = [
-      { userName: "Benito",  extId: 9000001, home: 3, away: 3 },
-      { userName: "Benito",  extId: 9000002, home: 1, away: 0 },
-      { userName: "Charlie", extId: 9000001, home: 1, away: 0 },
-      { userName: "Charlie", extId: 9000002, home: 2, away: 1 },
-      { userName: "Rodrigo", extId: 9000001, home: 2, away: 2 },
-      { userName: "Rodrigo", extId: 9000002, home: 0, away: 1 },
-      { userName: "Daniel",  extId: 9000001, home: 2, away: 0 },
-      { userName: "Daniel",  extId: 9000002, home: 0, away: 2 },
-      { userName: "MRB",     extId: 9000001, home: 1, away: 3 },
-      { userName: "MRB",     extId: 9000002, home: 1, away: 3 },
+    // Seed demo predictions
+    const demoPreds = [
+      { uEmail: "jbmartinez93@hotmail.com",            eid: 9000001, ph: 3, pa: 3 },
+      { uEmail: "jbmartinez93@hotmail.com",            eid: 9000002, ph: 1, pa: 0 },
+      { uEmail: "carlos.rodriguezp@mail.udp.cl",       eid: 9000001, ph: 1, pa: 0 },
+      { uEmail: "carlos.rodriguezp@mail.udp.cl",       eid: 9000002, ph: 2, pa: 1 },
+      { uEmail: "rodrigo.madariaga@alumni.ie.edu",     eid: 9000001, ph: 2, pa: 2 },
+      { uEmail: "rodrigo.madariaga@alumni.ie.edu",     eid: 9000002, ph: 0, pa: 1 },
+      { uEmail: "danbrionesr@gmail.com",               eid: 9000001, ph: 2, pa: 0 },
+      { uEmail: "danbrionesr@gmail.com",               eid: 9000002, ph: 0, pa: 2 },
+      { uEmail: "marpandres1994@gmail.com",            eid: 9000001, ph: 1, pa: 3 },
+      { uEmail: "marpandres1994@gmail.com",            eid: 9000002, ph: 1, pa: 3 },
     ];
 
-    for (const p of demoPredictions) {
-      const user = findUser(p.userName);
-      const match = findMatch(p.extId);
-      if (!user || !match) continue;
-
-      const existing = await db.select().from(predictions)
-        .where(and(eq(predictions.userId, user.id), eq(predictions.matchId, match.id)))
-        .limit(1);
-
-      if (existing.length === 0) {
-        await db.insert(predictions).values({ userId: user.id, matchId: match.id, predictedHome: p.home, predictedAway: p.away });
-      }
+    for (const p of demoPreds) {
+      await sql`
+        INSERT INTO predictions (user_id, match_id, predicted_home, predicted_away)
+        SELECT u.id, m.id, ${p.ph}, ${p.pa}
+        FROM users u, matches m
+        WHERE u.email = ${p.uEmail} AND m.external_id = ${p.eid}
+        ON CONFLICT (user_id, match_id) DO NOTHING
+      `;
     }
 
-    return NextResponse.json({ ok: true, message: "Seed completado" });
+    const users = await sql`SELECT name, email FROM users ORDER BY name`;
+    const matchCount = await sql`SELECT COUNT(*) FROM matches`;
+    const predCount  = await sql`SELECT COUNT(*) FROM predictions`;
+
+    return NextResponse.json({
+      ok: true,
+      users: users.map((u: Record<string, unknown>) => u.name),
+      matches: Number(matchCount[0].count),
+      predictions: Number(predCount[0].count),
+    });
   } catch (error) {
     console.error("Seed error:", error);
     return NextResponse.json({ error: String(error) }, { status: 500 });
