@@ -7,9 +7,13 @@ export async function GET() {
   try {
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Ensure schema is correct (idempotent)
+    // Recreate tables with correct schema
+    await sql`DROP TABLE IF EXISTS predictions CASCADE`;
+    await sql`DROP TABLE IF EXISTS matches CASCADE`;
+    await sql`DROP TABLE IF EXISTS users CASCADE`;
+
     await sql`
-      CREATE TABLE IF NOT EXISTS users (
+      CREATE TABLE users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL
@@ -17,7 +21,7 @@ export async function GET() {
     `;
 
     await sql`
-      CREATE TABLE IF NOT EXISTS matches (
+      CREATE TABLE matches (
         id SERIAL PRIMARY KEY,
         external_id INTEGER UNIQUE,
         home_team TEXT NOT NULL,
@@ -32,7 +36,7 @@ export async function GET() {
     `;
 
     await sql`
-      CREATE TABLE IF NOT EXISTS predictions (
+      CREATE TABLE predictions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),
         match_id INTEGER REFERENCES matches(id),
