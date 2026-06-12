@@ -1,0 +1,50 @@
+{
+  "name": "polla-mundialera",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:import-predictions": "tsx scripts/import-predictions.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "15.5.19",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5",
+    "@neondatabase/serverless": "^0.10.4",
+    "drizzle-orm": "^0.45.2",
+    "swr": "^2.3.3",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.513.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.0",
+    "@radix-ui/react-dialog": "^1.1.14",
+    "@radix-ui/react-toast": "^1.2.14",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-separator": "^1.1.7",
+    "sonner": "^2.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.4",
+    "vitest": "^3.2.3",
+    "dotenv": "^16.5.0"
+  }
+}
