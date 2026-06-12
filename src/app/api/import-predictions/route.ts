@@ -162,12 +162,20 @@ export async function GET() {
     const unmatched: string[] = [];
 
     for (const pred of PREDICTIONS) {
-      // Find matching match in DB (try both orientations — API may swap home/away)
-      const match = (dbMatches as Array<{id:number; home_team:string; away_team:string}>).find(
-        (m) =>
-          (matchTeam(pred.home, m.home_team) && matchTeam(pred.away, m.away_team)) ||
-          (matchTeam(pred.home, m.away_team) && matchTeam(pred.away, m.home_team))
+      type DBMatch = { id: number; home_team: string; away_team: string };
+      const dbMatchList = dbMatches as DBMatch[];
+
+      const directMatch = dbMatchList.find(
+        (m) => matchTeam(pred.home, m.home_team) && matchTeam(pred.away, m.away_team)
       );
+      const swappedMatch = !directMatch
+        ? dbMatchList.find(
+            (m) => matchTeam(pred.home, m.away_team) && matchTeam(pred.away, m.home_team)
+          )
+        : undefined;
+
+      const match = directMatch ?? swappedMatch;
+      const isSwapped = !directMatch && !!swappedMatch;
 
       if (!match) {
         unmatched.push(`${pred.home} vs ${pred.away}`);
@@ -176,7 +184,9 @@ export async function GET() {
       }
 
       for (const u of USERS) {
-        const scores = pred[u.preds] as [number, number];
+        const raw = pred[u.preds] as [number, number];
+        // If API has teams swapped vs spreadsheet, invert the predicted scores
+        const [ph, pa] = isSwapped ? [raw[1], raw[0]] : raw;
         const user = (dbUsers as Array<{id:number; email:string}>).find(
           (usr) => usr.email === u.email
         );
@@ -184,7 +194,7 @@ export async function GET() {
 
         await sql`
           INSERT INTO predictions (user_id, match_id, predicted_home, predicted_away)
-          VALUES (${user.id}, ${match.id}, ${scores[0]}, ${scores[1]})
+          VALUES (${user.id}, ${match.id}, ${ph}, ${pa})
           ON CONFLICT (user_id, match_id) DO UPDATE SET
             predicted_home = EXCLUDED.predicted_home,
             predicted_away = EXCLUDED.predicted_away,

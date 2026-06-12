@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { matches } from "@/lib/db/schema";
-import { asc } from "drizzle-orm";
+import { asc, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,7 @@ export async function GET() {
     const allMatches = await db
       .select()
       .from(matches)
+      .where(sql`home_team != 'TBD' AND away_team != 'TBD'`)
       .orderBy(asc(matches.kickoff));
 
     return NextResponse.json(allMatches);
