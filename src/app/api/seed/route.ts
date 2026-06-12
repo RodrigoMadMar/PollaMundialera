@@ -91,7 +91,7 @@ export async function GET() {
     // Seed demo predictions
     const demoPreds = [
       { uEmail: "jbmartinez93@hotmail.com",            eid: 9000001, ph: 3, pa: 3 },
-      { uEmail: "jbmartinez93@hotmail.com",            eid: 9000002, ph: 1, pa: 0 },
+      { uEmail: "jbmartinez93@hotmail.com",            eid: 9000002, ph: 0, pa: 2 },
       { uEmail: "carlos.rodriguezp@mail.udp.cl",       eid: 9000001, ph: 1, pa: 0 },
       { uEmail: "carlos.rodriguezp@mail.udp.cl",       eid: 9000002, ph: 2, pa: 1 },
       { uEmail: "rodrigo.madariaga@alumni.ie.edu",     eid: 9000001, ph: 2, pa: 2 },

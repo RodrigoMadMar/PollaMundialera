@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncMatches } from "@/lib/football-data";
 import { revalidatePath } from "next/cache";
+import { neon } from "@neondatabase/serverless";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Remove old WC matches (pre-2026) that may have been synced previously.
+    // Demo matches use external_id >= 9000000 so we keep those.
+    const sql = neon(process.env.DATABASE_URL!);
+    await sql`
+      DELETE FROM predictions
+      WHERE match_id IN (
+        SELECT id FROM matches
+        WHERE external_id < 9000000
+          AND kickoff < '2026-01-01'
+      )
+    `;
+    await sql`
+      DELETE FROM matches
+      WHERE external_id < 9000000
+        AND kickoff < '2026-01-01'
+    `;
+
     const result = await syncMatches();
     revalidatePath("/");
     revalidatePath("/api/matches");
@@ -21,6 +39,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     console.error("Sync error:", error);
-    return NextResponse.json({ error: "Sync failed" }, { status: 500 });
+    return NextResponse.json({ error: String(error) }, { status: 500 });
   }
 }

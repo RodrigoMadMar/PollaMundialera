@@ -28,21 +28,23 @@ export interface APIMatch {
   };
 }
 
+const WC_SEASON = "2026";
+
 export async function getWorldCupMatches(): Promise<APIMatch[]> {
-  const data = await fetchAPI(`/competitions/${COMPETITION}/matches`);
+  const data = await fetchAPI(`/competitions/${COMPETITION}/matches?season=${WC_SEASON}`);
   return data.matches ?? [];
 }
 
 export async function getUpcomingMatches(): Promise<APIMatch[]> {
   const data = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?status=SCHEDULED,TIMED`
+    `/competitions/${COMPETITION}/matches?season=${WC_SEASON}&status=SCHEDULED,TIMED`
   );
   return data.matches ?? [];
 }
 
 export async function getFinishedMatches(): Promise<APIMatch[]> {
   const data = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?status=FINISHED`
+    `/competitions/${COMPETITION}/matches?season=${WC_SEASON}&status=FINISHED`
   );
   return data.matches ?? [];
 }
