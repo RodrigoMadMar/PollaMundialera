@@ -33,6 +33,20 @@ export async function GET(request: NextRequest) {
     `;
 
     const result = await syncMatches();
+
+    // If real 2026 matches were synced, remove demo placeholder upcoming matches
+    if (result.synced > 0) {
+      await sql`
+        DELETE FROM predictions
+        WHERE match_id IN (
+          SELECT id FROM matches WHERE external_id >= 9000000 AND finished = false
+        )
+      `;
+      await sql`
+        DELETE FROM matches WHERE external_id >= 9000000 AND finished = false
+      `;
+    }
+
     revalidatePath("/");
     revalidatePath("/api/matches");
     revalidatePath("/api/leaderboard");

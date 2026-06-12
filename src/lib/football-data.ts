@@ -75,8 +75,8 @@ export async function syncMatches() {
     if (existing.length === 0) {
       await db.insert(matches).values({
         externalId: m.id,
-        homeTeam: m.homeTeam.name,
-        awayTeam: m.awayTeam.name,
+        homeTeam: m.homeTeam.name || "TBD",
+        awayTeam: m.awayTeam.name || "TBD",
         kickoff,
         homeScore: homeScore ?? null,
         awayScore: awayScore ?? null,
@@ -87,6 +87,8 @@ export async function syncMatches() {
       await db
         .update(matches)
         .set({
+          homeTeam: m.homeTeam.name || "TBD",
+          awayTeam: m.awayTeam.name || "TBD",
           homeScore: homeScore ?? null,
           awayScore: awayScore ?? null,
           status: m.status,
