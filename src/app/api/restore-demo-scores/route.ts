@@ -8,21 +8,21 @@ export const dynamic = "force-dynamic";
 // Targets: Benito 5pts, Charlie 5pts, Rodrigo 3pts, Daniel 0pts, MRB 0pts
 //
 // Distribution:
-//   Match 1 (México 2-0 SA):  Benito 2-0 (exact=5), Rodrigo 1-0 (winner=3), rest wrong
-//   Match 2 (SKorea 2-1 CZE): Charlie 2-1 (exact=5), rest wrong
+//   Match 1 (México 2-0 SA):  Benito 2-0 (exact=5), Charlie 2-0 (exact=5), rest wrong
+//   Match 2 (SKorea 2-1 CZE): Rodrigo 1-0 (winner=3), rest wrong
 const PREDS_MATCH1 = [
   { email: "jbmartinez93@hotmail.com",        ph: 2, pa: 0 }, // exact → 5pts
-  { email: "carlos.rodriguezp@mail.udp.cl",   ph: 0, pa: 1 }, // wrong → 0pts
-  { email: "rodrigo.madariaga@alumni.ie.edu", ph: 1, pa: 0 }, // winner → 3pts
+  { email: "carlos.rodriguezp@mail.udp.cl",   ph: 2, pa: 0 }, // exact → 5pts
+  { email: "rodrigo.madariaga@alumni.ie.edu", ph: 0, pa: 1 }, // wrong → 0pts
   { email: "danbrionesr@gmail.com",           ph: 0, pa: 1 }, // wrong → 0pts
   { email: "marpandres1994@gmail.com",        ph: 1, pa: 2 }, // wrong → 0pts
 ];
 const PREDS_MATCH2 = [
   { email: "jbmartinez93@hotmail.com",        ph: 0, pa: 2 }, // wrong → 0pts
-  { email: "carlos.rodriguezp@mail.udp.cl",   ph: 2, pa: 1 }, // exact → 5pts
-  { email: "rodrigo.madariaga@alumni.ie.edu", ph: 0, pa: 2 }, // wrong → 0pts
-  { email: "danbrionesr@gmail.com",           ph: 1, pa: 0 }, // wrong → 0pts
-  { email: "marpandres1994@gmail.com",        ph: 0, pa: 0 }, // wrong → 0pts
+  { email: "carlos.rodriguezp@mail.udp.cl",   ph: 0, pa: 2 }, // wrong → 0pts
+  { email: "rodrigo.madariaga@alumni.ie.edu", ph: 1, pa: 0 }, // winner → 3pts
+  { email: "danbrionesr@gmail.com",           ph: 0, pa: 2 }, // wrong → 0pts
+  { email: "marpandres1994@gmail.com",        ph: 0, pa: 2 }, // wrong → 0pts
 ];
 
 export async function GET() {
