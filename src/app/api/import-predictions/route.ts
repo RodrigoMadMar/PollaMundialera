@@ -3,61 +3,61 @@ import { neon } from "@neondatabase/serverless";
 
 export const dynamic = "force-dynamic";
 
-// Spanish name → possible API name variants (lowercase, no accents)
-const NAME_MAP: Record<string, string[]> = {
-  "méxico": ["mexico"],
-  "sudáfrica": ["south africa"],
-  "república de corea": ["korea republic", "south korea"],
-  "chequia": ["czechia", "czech republic"],
-  "canadá": ["canada"],
-  "bosnia y herzegovina": ["bosnia and herzegovina", "bosnia & herzegovina"],
-  "catar": ["qatar"],
-  "suiza": ["switzerland"],
-  "brasil": ["brazil"],
-  "marruecos": ["morocco"],
-  "escocia": ["scotland"],
-  "haití": ["haiti"],
-  "ee. uu.": ["usa", "united states", "united states of america"],
-  "paraguay": ["paraguay"],
-  "australia": ["australia"],
-  "turquía": ["turkey", "türkiye"],
-  "costa de marfil": ["ivory coast", "côte d'ivoire", "cote d'ivoire"],
-  "ecuador": ["ecuador"],
-  "alemania": ["germany"],
-  "curazao": ["curaçao", "curacao"],
-  "países bajos": ["netherlands"],
-  "japón": ["japan"],
-  "suecia": ["sweden"],
-  "túnez": ["tunisia"],
-  "ri de irán": ["iran", "ir iran"],
-  "nueva zelanda": ["new zealand"],
-  "bélgica": ["belgium"],
-  "egipto": ["egypt"],
-  "arabia saudí": ["saudi arabia"],
-  "uruguay": ["uruguay"],
-  "españa": ["spain"],
-  "cabo verde": ["cape verde"],
-  "francia": ["france"],
-  "senegal": ["senegal"],
-  "irak": ["iraq"],
-  "noruega": ["norway"],
-  "argentina": ["argentina"],
-  "argelia": ["algeria"],
-  "austria": ["austria"],
-  "jordania": ["jordan"],
-  "portugal": ["portugal"],
-  "rd congo": ["dr congo", "congo dr", "democratic republic of congo"],
-  "uzbekistán": ["uzbekistan"],
-  "colombia": ["colombia"],
-  "ghana": ["ghana"],
-  "panamá": ["panama"],
-  "inglaterra": ["england"],
-  "croacia": ["croatia"],
-};
-
 function normalize(s: string) {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 }
+
+// Keys are already normalized (no accents). Values are possible API names (also normalized at lookup).
+const NAME_MAP: Record<string, string[]> = {
+  "mexico":                ["mexico"],
+  "sudafrica":             ["south africa"],
+  "republica de corea":    ["south korea", "korea republic"],
+  "chequia":               ["czechia", "czech republic"],
+  "canada":                ["canada"],
+  "bosnia y herzegovina":  ["bosnia-herzegovina", "bosnia and herzegovina", "bosnia & herzegovina"],
+  "catar":                 ["qatar"],
+  "suiza":                 ["switzerland"],
+  "brasil":                ["brazil"],
+  "marruecos":             ["morocco"],
+  "escocia":               ["scotland"],
+  "haiti":                 ["haiti"],
+  "ee. uu.":               ["united states", "usa", "united states of america"],
+  "paraguay":              ["paraguay"],
+  "australia":             ["australia"],
+  "turquia":               ["turkey", "turkiye"],
+  "costa de marfil":       ["ivory coast", "cote d'ivoire"],
+  "ecuador":               ["ecuador"],
+  "alemania":              ["germany"],
+  "curazao":               ["curacao", "curaçao"],
+  "paises bajos":          ["netherlands"],
+  "japon":                 ["japan"],
+  "suecia":                ["sweden"],
+  "tunez":                 ["tunisia"],
+  "ri de iran":            ["iran", "ir iran"],
+  "nueva zelanda":         ["new zealand"],
+  "belgica":               ["belgium"],
+  "egipto":                ["egypt"],
+  "arabia saudi":          ["saudi arabia"],
+  "uruguay":               ["uruguay"],
+  "espana":                ["spain"],
+  "cabo verde":            ["cape verde islands", "cape verde"],
+  "francia":               ["france"],
+  "senegal":               ["senegal"],
+  "irak":                  ["iraq"],
+  "noruega":               ["norway"],
+  "argentina":             ["argentina"],
+  "argelia":               ["algeria"],
+  "austria":               ["austria"],
+  "jordania":              ["jordan"],
+  "portugal":              ["portugal"],
+  "rd congo":              ["congo dr", "dr congo"],
+  "uzbekistan":            ["uzbekistan"],
+  "colombia":              ["colombia"],
+  "ghana":                 ["ghana"],
+  "panama":                ["panama"],
+  "inglaterra":            ["england"],
+  "croacia":               ["croatia"],
+};
 
 function matchTeam(spanish: string, dbName: string): boolean {
   const spNorm = normalize(spanish);
@@ -162,9 +162,11 @@ export async function GET() {
     const unmatched: string[] = [];
 
     for (const pred of PREDICTIONS) {
-      // Find matching match in DB
+      // Find matching match in DB (try both orientations — API may swap home/away)
       const match = (dbMatches as Array<{id:number; home_team:string; away_team:string}>).find(
-        (m) => matchTeam(pred.home, m.home_team) && matchTeam(pred.away, m.away_team)
+        (m) =>
+          (matchTeam(pred.home, m.home_team) && matchTeam(pred.away, m.away_team)) ||
+          (matchTeam(pred.home, m.away_team) && matchTeam(pred.away, m.home_team))
       );
 
       if (!match) {
