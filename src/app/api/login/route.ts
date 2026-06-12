@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { neon } from "@neondatabase/serverless";
 import { setSessionCookie } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -12,19 +10,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email requerido" }, { status: 400 });
     }
 
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email.toLowerCase().trim()))
-      .limit(1);
+    const sql = neon(process.env.DATABASE_URL!);
+    const rows = await sql`
+      SELECT id, name, email FROM users
+      WHERE email = ${email.toLowerCase().trim()}
+      LIMIT 1
+    `;
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Email no autorizado" },
-        { status: 401 }
-      );
+    if (!rows[0]) {
+      return NextResponse.json({ error: "Email no autorizado" }, { status: 401 });
     }
 
+    const user = rows[0] as { id: number; name: string; email: string };
     await setSessionCookie(user.email);
 
     return NextResponse.json({ ok: true, name: user.name });

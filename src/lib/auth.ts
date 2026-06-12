@@ -1,23 +1,24 @@
 import { cookies } from "next/headers";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { neon } from "@neondatabase/serverless";
 
 const COOKIE_NAME = "pm_session";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
+function getSql() {
+  return neon(process.env.DATABASE_URL!);
+}
 
 export async function getSessionUser() {
   const cookieStore = await cookies();
   const email = cookieStore.get(COOKIE_NAME)?.value;
   if (!email) return null;
 
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, name, email FROM users WHERE email = ${email} LIMIT 1
+  `;
 
-  return user ?? null;
+  return rows[0] as { id: number; name: string; email: string } | undefined ?? null;
 }
 
 export async function setSessionCookie(email: string) {
