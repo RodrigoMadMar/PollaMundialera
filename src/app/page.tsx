@@ -1,6 +1,7 @@
 import { Globe2 } from "lucide-react";
 import { LeaderboardTable } from "@/components/leaderboard-table";
 import { UpcomingMatches, FinishedMatches, LastUpdated } from "@/components/matches-section";
+import { SyncButton } from "@/components/sync-button";
 
 export default function HomePage() {
   return (
@@ -15,8 +16,9 @@ export default function HomePage() {
         <p className="text-muted-foreground">
           Pronósticos del Mundial de Fútbol
         </p>
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-3">
           <LastUpdated />
+          <SyncButton />
         </div>
       </div>
 
