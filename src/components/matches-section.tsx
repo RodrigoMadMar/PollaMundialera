@@ -69,7 +69,7 @@ export function UpcomingMatches() {
     refreshInterval: 120_000,
   });
 
-  const upcoming = data?.filter((m) => !m.finished).slice(0, 8) ?? [];
+  const upcoming = Array.isArray(data) ? data.filter((m) => !m.finished).slice(0, 8) : [];
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur">
@@ -103,7 +103,7 @@ export function FinishedMatches() {
     refreshInterval: 120_000,
   });
 
-  const finished = data?.filter((m) => m.finished).reverse().slice(0, 8) ?? [];
+  const finished = Array.isArray(data) ? [...data].filter((m) => m.finished).reverse().slice(0, 8) : [];
 
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur">
@@ -137,7 +137,7 @@ export function LastUpdated() {
     refreshInterval: 120_000,
   });
 
-  if (!data?.length) return null;
+  if (!Array.isArray(data) || !data.length) return null;
 
   const latest = data.reduce((a, b) =>
     new Date(a.updatedAt) > new Date(b.updatedAt) ? a : b
