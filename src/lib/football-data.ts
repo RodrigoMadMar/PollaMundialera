@@ -53,14 +53,32 @@ export async function syncMatches() {
   const { matches } = await import("@/lib/db/schema");
   const { eq } = await import("drizzle-orm");
 
-  const apiMatches = await getWorldCupMatches();
-
-  // Only sync matches from 2026 onwards (filter out old World Cup editions)
-  const wc2026 = apiMatches.filter(
-    (m) => new Date(m.utcDate).getFullYear() >= 2026
+  // Fetch matches from yesterday through tomorrow to catch live/recently finished games
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const data = await fetchAPI(
+    `/competitions/${COMPETITION}/matches?dateFrom=${yesterday}&dateTo=${tomorrow}`
+  );
+  const todayMatches: APIMatch[] = (data.matches ?? []).filter(
+    (m: APIMatch) => new Date(m.utcDate).getFullYear() >= 2026
   );
 
-  for (const m of wc2026) {
+  // Also fetch live matches in case they started yesterday UTC
+  const liveData = await fetchAPI(
+    `/competitions/${COMPETITION}/matches?status=IN_PLAY,PAUSED,HALFTIME`
+  );
+  const liveMatches: APIMatch[] = (liveData.matches ?? []).filter(
+    (m: APIMatch) => new Date(m.utcDate).getFullYear() >= 2026
+  );
+
+  // Merge, deduplicate by id
+  const seen = new Set<number>();
+  const toSync: APIMatch[] = [];
+  for (const m of [...todayMatches, ...liveMatches]) {
+    if (!seen.has(m.id)) { seen.add(m.id); toSync.push(m); }
+  }
+
+  for (const m of toSync) {
     const kickoff = new Date(m.utcDate);
     const homeScore = m.score.fullTime.home;
     const awayScore = m.score.fullTime.away;
@@ -99,5 +117,5 @@ export async function syncMatches() {
     }
   }
 
-  return { total: apiMatches.length, synced: wc2026.length };
+  return { synced: toSync.length };
 }
