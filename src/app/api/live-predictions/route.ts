@@ -1,12 +1,43 @@
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { calculatePoints } from "@/lib/points";
+import { syncMatches } from "@/lib/football-data";
 
 export const dynamic = "force-dynamic";
+
+// Auto-sync throttle: only call the external API once every 25s (across all users)
+// and only when there's actually a match in its play window.
+async function maybeAutoSync() {
+  const sql = neon(process.env.DATABASE_URL!);
+  // Is there a match currently in its play window? (started within last 3h, not finished)
+  const active = (await sql`
+    SELECT MAX(updated_at) AS last_update
+    FROM matches
+    WHERE finished = false
+      AND kickoff <= NOW()
+      AND kickoff >= NOW() - INTERVAL '3 hours'
+      AND home_team != 'TBD' AND away_team != 'TBD'
+  `) as Array<{ last_update: string | null }>;
+
+  // No active match → nothing to auto-sync, save the API call
+  if (!active[0]?.last_update) return;
+
+  const lastUpdate = new Date(active[0].last_update).getTime();
+  const ageSeconds = (Date.now() - lastUpdate) / 1000;
+  if (ageSeconds < 25) return; // synced recently by another request
+
+  try {
+    await syncMatches();
+  } catch {
+    // Swallow errors so the read still returns; sync will retry next poll
+  }
+}
 
 export async function GET() {
   try {
     const sql = neon(process.env.DATABASE_URL!);
+
+    await maybeAutoSync();
 
     const liveMatches = await sql`
       SELECT id, home_team, away_team, home_score, away_score, status, kickoff
