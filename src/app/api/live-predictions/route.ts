@@ -11,7 +11,14 @@ export async function GET() {
     const liveMatches = await sql`
       SELECT id, home_team, away_team, home_score, away_score, status, kickoff
       FROM matches
-      WHERE status IN ('IN_PLAY', 'LIVE', 'PAUSED', 'HALFTIME')
+      WHERE (
+        status IN ('IN_PLAY', 'LIVE', 'PAUSED')
+        OR (
+          finished = false
+          AND kickoff <= NOW()
+          AND kickoff >= NOW() - INTERVAL '3 hours'
+        )
+      )
         AND home_team != 'TBD' AND away_team != 'TBD'
       ORDER BY kickoff ASC
     `;

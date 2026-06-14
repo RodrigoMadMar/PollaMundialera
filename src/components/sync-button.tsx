@@ -4,6 +4,7 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { mutate } from "swr";
 
 export function SyncButton() {
   const [loading, setLoading] = useState(false);
@@ -15,6 +16,8 @@ export function SyncButton() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error");
       toast.success(`Sincronizado — ${data.synced ?? 0} partidos actualizados`);
+      // Revalidate all SWR keys so matches, leaderboard and live scores refresh immediately
+      await mutate(() => true, undefined, { revalidate: true });
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Error al sincronizar");
     } finally {
