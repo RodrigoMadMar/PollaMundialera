@@ -65,7 +65,7 @@ export async function syncMatches() {
 
   // Also fetch live matches in case they started yesterday UTC
   const liveData = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?status=IN_PLAY,PAUSED,HALFTIME`
+    `/competitions/${COMPETITION}/matches?status=IN_PLAY,PAUSED,LIVE`
   );
   const liveMatches: APIMatch[] = (liveData.matches ?? []).filter(
     (m: APIMatch) => new Date(m.utcDate).getFullYear() >= 2026
