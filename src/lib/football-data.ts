@@ -26,7 +26,17 @@ export interface APIMatch {
   score: {
     winner: string | null;
     fullTime: { home: number | null; away: number | null };
+    halfTime?: { home: number | null; away: number | null };
+    extraTime?: { home: number | null; away: number | null };
+    penalties?: { home: number | null; away: number | null };
   };
+}
+
+function resolveScore(score: APIMatch["score"]): { home: number | null; away: number | null } {
+  // Use the most advanced score available (penalties > extraTime > fullTime)
+  if (score.penalties?.home !== null && score.penalties?.home !== undefined) return score.penalties;
+  if (score.extraTime?.home !== null && score.extraTime?.home !== undefined) return score.extraTime;
+  return score.fullTime;
 }
 
 export async function getWorldCupMatches(): Promise<APIMatch[]> {
@@ -80,8 +90,9 @@ export async function syncMatches() {
 
   for (const m of toSync) {
     const kickoff = new Date(m.utcDate);
-    const homeScore = m.score.fullTime.home;
-    const awayScore = m.score.fullTime.away;
+    const resolved = resolveScore(m.score);
+    const homeScore = resolved.home;
+    const awayScore = resolved.away;
     const finished = m.status === "FINISHED";
 
     const existing = await db
