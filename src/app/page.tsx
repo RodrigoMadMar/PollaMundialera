@@ -1,8 +1,9 @@
 import { Globe2 } from "lucide-react";
 import { LeaderboardTable } from "@/components/leaderboard-table";
-import { UpcomingMatches, FinishedMatches, LastUpdated } from "@/components/matches-section";
+import { UpcomingMatches, LastUpdated } from "@/components/matches-section";
 import { SyncButton } from "@/components/sync-button";
 import { LiveMatches } from "@/components/live-matches";
+import { FinishedWithScores } from "@/components/finished-with-scores";
 
 export default function HomePage() {
   return (
@@ -29,7 +30,7 @@ export default function HomePage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <UpcomingMatches />
-        <FinishedMatches />
+        <FinishedWithScores />
       </div>
     </div>
   );
