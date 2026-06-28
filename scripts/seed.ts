@@ -49,41 +49,49 @@ async function seedDemoState() {
   const demoMatches = [
     {
       externalId: 9000001,
+      phase: "GROUP_STAGE",
       homeTeam: "Argentina",
       awayTeam: "Francia",
       kickoff: past(50),
       homeScore: 3,
       awayScore: 3,
+      winner: "draw",
       status: "FINISHED",
       finished: true,
     },
     {
       externalId: 9000002,
+      phase: "GROUP_STAGE",
       homeTeam: "Brasil",
       awayTeam: "Alemania",
       kickoff: past(26),
       homeScore: 2,
       awayScore: 1,
+      winner: "home",
       status: "FINISHED",
       finished: true,
     },
     {
       externalId: 9000003,
+      phase: "GROUP_STAGE",
       homeTeam: "España",
       awayTeam: "Portugal",
       kickoff: new Date(now.getTime() + 3 * 3600 * 1000),
       homeScore: null,
       awayScore: null,
+      winner: null,
       status: "SCHEDULED",
       finished: false,
     },
     {
       externalId: 9000004,
+      phase: "GROUP_STAGE",
       homeTeam: "Inglaterra",
       awayTeam: "Italia",
       kickoff: new Date(now.getTime() + 27 * 3600 * 1000),
       homeScore: null,
       awayScore: null,
+      winner: null,
       status: "SCHEDULED",
       finished: false,
     },
@@ -110,17 +118,17 @@ async function seedDemoState() {
   const findUser = (name: string) => users.find((u) => u.name === name);
   const findMatch = (extId: number) => matches.find((m) => m.externalId === extId);
 
-  // Initial state: Benito 5pts, Charlie 5pts, Rodrigo 3pts, Daniel 0pts, MRB 0pts
+  // Initial state: Benito 8pts, Charlie 8pts, Rodrigo 3pts, Daniel 0pts, MRB 0pts
   // Match 1: Argentina 3-3 Francia (actual)
   // Match 2: Brasil 2-1 Alemania (actual)
   const demoPredictions = [
-    // Benito: 5pts (exact on match1 = 5pts)
+    // Benito: 8pts (exact + draw on match1)
     { userName: "Benito", extId: 9000001, home: 3, away: 3 },
     { userName: "Benito", extId: 9000002, home: 1, away: 0 },
-    // Charlie: 5pts (exact on match2 = 5pts)
+    // Charlie: 8pts (exact + winner on match2)
     { userName: "Charlie", extId: 9000001, home: 1, away: 0 },
     { userName: "Charlie", extId: 9000002, home: 2, away: 1 },
-    // Rodrigo: 3pts (correct winner on match1 = 3pts)
+    // Rodrigo: 3pts (correct draw on match1)
     { userName: "Rodrigo", extId: 9000001, home: 2, away: 2 },
     { userName: "Rodrigo", extId: 9000002, home: 0, away: 1 },
     // Daniel: 0pts
