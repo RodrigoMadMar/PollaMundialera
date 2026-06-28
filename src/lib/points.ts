@@ -154,10 +154,7 @@ export function calculatePredictionScore({
     actual.awayScore === predicted.awayScore;
   const correctOutcome = getOutcome(actual) === getOutcome(predicted);
   const exactScorePoints = exactScore ? config.exactPoints : 0;
-  const outcomePoints =
-    correctOutcome && !(normalizedPhase === "GROUP_STAGE" && exactScore)
-      ? config.outcomePoints
-      : 0;
+  const outcomePoints = !exactScore && correctOutcome ? config.outcomePoints : 0;
 
   return {
     phase: normalizedPhase,
