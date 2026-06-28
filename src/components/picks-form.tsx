@@ -62,6 +62,38 @@ function getScoreWinner(home: string, away: string): Outcome | null {
   return getWinner({ homeScore, awayScore });
 }
 
+function getKickoffTime(match: Match): number {
+  return new Date(match.kickoff).getTime();
+}
+
+function sortMatchesForPhase(matches: Match[]): Match[] {
+  return [...matches].sort((a, b) => {
+    if (a.finished !== b.finished) return a.finished ? 1 : -1;
+
+    const diff = getKickoffTime(a) - getKickoffTime(b);
+    return a.finished ? -diff : diff;
+  });
+}
+
+function getNextMatchTime(matches: Match[]): number {
+  const upcomingTimes = matches
+    .filter((match) => !match.finished)
+    .map(getKickoffTime);
+
+  return upcomingTimes.length ? Math.min(...upcomingTimes) : Number.POSITIVE_INFINITY;
+}
+
+function getLastMatchTime(matches: Match[]): number {
+  const times = matches.map(getKickoffTime);
+  return times.length ? Math.max(...times) : Number.NEGATIVE_INFINITY;
+}
+
+function getPhasePriority(matches: Match[]): number {
+  if (matches.some((match) => !match.finished)) return 0;
+  if (matches.length === 0) return 1;
+  return 2;
+}
+
 function MatchPickRow({
   match,
   prediction,
@@ -304,10 +336,25 @@ export function PicksForm() {
     );
   }
 
-  const phaseGroups = PHASES.map((phase) => ({
-    phase,
-    matches: matchList.filter((match) => normalizePhase(match.phase) === phase),
-  }));
+  const phaseGroups = PHASES.map((phase, phaseIndex) => {
+    const phaseMatches = sortMatchesForPhase(
+      matchList.filter((match) => normalizePhase(match.phase) === phase)
+    );
+
+    return {
+      phase,
+      phaseIndex,
+      matches: phaseMatches,
+      priority: getPhasePriority(phaseMatches),
+      nextMatchTime: getNextMatchTime(phaseMatches),
+      lastMatchTime: getLastMatchTime(phaseMatches),
+    };
+  }).sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    if (a.priority === 0) return a.nextMatchTime - b.nextMatchTime;
+    if (a.priority === 2) return b.lastMatchTime - a.lastMatchTime;
+    return a.phaseIndex - b.phaseIndex;
+  });
 
   return (
     <div className="space-y-6">
