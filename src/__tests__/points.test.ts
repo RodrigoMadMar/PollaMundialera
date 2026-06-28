@@ -10,11 +10,11 @@ describe("calculatePoints", () => {
     expect(calculatePoints({ homeScore: 1, awayScore: 1 }, { homeScore: 1, awayScore: 1 })).toBe(5);
   });
 
-  it("returns 3 for correct group-stage winner only", () => {
+  it("keeps group-stage winner-only scoring at 3 points", () => {
     expect(calculatePoints({ homeScore: 2, awayScore: 1 }, { homeScore: 1, awayScore: 0 })).toBe(3);
   });
 
-  it("returns 3 for correct group-stage draw only", () => {
+  it("keeps group-stage draw-only scoring at 3 points", () => {
     expect(calculatePoints({ homeScore: 1, awayScore: 1 }, { homeScore: 0, awayScore: 0 })).toBe(3);
   });
 
@@ -22,27 +22,51 @@ describe("calculatePoints", () => {
     expect(calculatePoints({ homeScore: 0, awayScore: 1 }, { homeScore: 2, awayScore: 0 })).toBe(0);
   });
 
-  it("uses round-of-32 exact and qualifier points", () => {
+  it("returns 10 for exact score in round of 32 without adding qualifier points", () => {
     expect(
       calculatePoints(
         { homeScore: 2, awayScore: 1, winner: "home" },
         { homeScore: 2, awayScore: 1, winner: "home" },
         "ROUND_OF_32"
       )
-    ).toBe(16);
+    ).toBe(10);
   });
 
-  it("uses round-of-16 exact and qualifier points", () => {
+  it("returns 6 for round-of-32 qualifier only", () => {
+    expect(
+      calculatePoints(
+        { homeScore: 2, awayScore: 1, winner: "home" },
+        { homeScore: 1, awayScore: 0, winner: "home" },
+        "ROUND_OF_32"
+      )
+    ).toBe(6);
+  });
+
+  it("returns exact points for octavos, cuartos and semifinales", () => {
     expect(
       calculatePoints(
         { homeScore: 3, awayScore: 2, winner: "away" },
         { homeScore: 3, awayScore: 2, winner: "away" },
         "LAST_16"
       )
-    ).toBe(22);
+    ).toBe(14);
+    expect(
+      calculatePoints(
+        { homeScore: 1, awayScore: 0, winner: "home" },
+        { homeScore: 1, awayScore: 0, winner: "home" },
+        "QUARTER_FINALS"
+      )
+    ).toBe(20);
+    expect(
+      calculatePoints(
+        { homeScore: 2, awayScore: 2, winner: "away" },
+        { homeScore: 2, awayScore: 2, winner: "away" },
+        "SEMI_FINALS"
+      )
+    ).toBe(28);
   });
 
-  it("awards exact score only when a tied knockout score has the wrong penalty qualifier", () => {
+  it("returns exact score points only when penalties qualifier is wrong", () => {
     const result = calculatePredictionScore({
       phase: "ROUND_OF_32",
       actual: { homeScore: 1, awayScore: 1, winner: "home" },
@@ -54,7 +78,7 @@ describe("calculatePoints", () => {
     expect(result.total).toBe(10);
   });
 
-  it("awards qualifier only when the tied knockout score is wrong but qualifier is right", () => {
+  it("returns qualifier points only when tied knockout score is wrong but qualifier is right", () => {
     const result = calculatePredictionScore({
       phase: "ROUND_OF_32",
       actual: { homeScore: 2, awayScore: 2, winner: "home" },
@@ -66,14 +90,24 @@ describe("calculatePoints", () => {
     expect(result.total).toBe(6);
   });
 
-  it("weights the final more heavily", () => {
+  it("returns 40 for exact final score without adding champion points", () => {
     expect(
       calculatePoints(
         { homeScore: 2, awayScore: 0, winner: "home" },
         { homeScore: 2, awayScore: 0, winner: "home" },
         "FINAL"
       )
-    ).toBe(65);
+    ).toBe(40);
+  });
+
+  it("returns 25 for final winner only", () => {
+    expect(
+      calculatePoints(
+        { homeScore: 2, awayScore: 0, winner: "home" },
+        { homeScore: 1, awayScore: 0, winner: "home" },
+        "FINAL"
+      )
+    ).toBe(25);
   });
 
   it("normalizes common API phase names", () => {
