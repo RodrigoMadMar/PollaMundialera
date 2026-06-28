@@ -11,6 +11,16 @@ import {
 
 export const dynamic = "force-dynamic";
 
+interface MatchPointDetail {
+  matchId: number;
+  phase: MatchPhase;
+  homeTeam: string;
+  awayTeam: string;
+  points: number;
+  exactScorePoints: number;
+  outcomePoints: number;
+}
+
 export async function GET() {
   try {
     const allUsers = await db.select().from(users);
@@ -48,7 +58,7 @@ export async function GET() {
         const phasePoints = Object.fromEntries(
           PHASES.map((phase) => [phase, 0])
         ) as Record<MatchPhase, number>;
-        const details = [];
+        const details: MatchPointDetail[] = [];
 
         for (const p of userPredictions) {
           const breakdown = calculatePredictionScore({
