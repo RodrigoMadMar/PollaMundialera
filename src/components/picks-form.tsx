@@ -5,21 +5,31 @@ import useSWR from "swr";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Lock, Save, CheckCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { isMatchLocked } from "@/lib/auth-client";
+import {
+  PHASES,
+  getPhaseLabel,
+  getWinner,
+  isKnockoutPhase,
+  normalizePhase,
+  type Outcome,
+} from "@/lib/points";
 
 interface Match {
   id: number;
+  phase: string;
   homeTeam: string;
   awayTeam: string;
   kickoff: string;
   homeScore: number | null;
   awayScore: number | null;
+  winner: Outcome | null;
   status: string;
   finished: boolean;
 }
@@ -28,9 +38,20 @@ interface Prediction {
   matchId: number;
   predictedHome: number | null;
   predictedAway: number | null;
+  predictedWinner: Outcome | null;
 }
 
+type Qualifier = "home" | "away";
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+function getScoreWinner(home: string, away: string): Outcome | null {
+  if (home === "" || away === "") return null;
+  const homeScore = Number(home);
+  const awayScore = Number(away);
+  if (Number.isNaN(homeScore) || Number.isNaN(awayScore)) return null;
+  return getWinner({ homeScore, awayScore });
+}
 
 function MatchPickRow({
   match,
@@ -39,10 +60,20 @@ function MatchPickRow({
 }: {
   match: Match;
   prediction?: Prediction;
-  onSave: (matchId: number, home: number, away: number) => Promise<void>;
+  onSave: (
+    matchId: number,
+    home: number,
+    away: number,
+    predictedWinner?: Qualifier
+  ) => Promise<void>;
 }) {
   const [home, setHome] = useState(prediction?.predictedHome?.toString() ?? "");
   const [away, setAway] = useState(prediction?.predictedAway?.toString() ?? "");
+  const [winner, setWinner] = useState<Qualifier | "">(
+    prediction?.predictedWinner === "home" || prediction?.predictedWinner === "away"
+      ? prediction.predictedWinner
+      : ""
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -50,11 +81,22 @@ function MatchPickRow({
     if (prediction) {
       setHome(prediction.predictedHome?.toString() ?? "");
       setAway(prediction.predictedAway?.toString() ?? "");
+      setWinner(
+        prediction.predictedWinner === "home" || prediction.predictedWinner === "away"
+          ? prediction.predictedWinner
+          : ""
+      );
     }
   }, [prediction]);
 
+  const phase = normalizePhase(match.phase);
+  const knockout = isKnockoutPhase(phase);
   const locked = isMatchLocked(match.kickoff);
   const kickoff = new Date(match.kickoff);
+  const scoreWinner = getScoreWinner(home, away);
+  const needsQualifier = knockout && scoreWinner === "draw";
+  const effectiveWinner =
+    knockout && scoreWinner && scoreWinner !== "draw" ? scoreWinner : winner;
 
   const handleSave = async () => {
     const h = parseInt(home);
@@ -63,9 +105,24 @@ function MatchPickRow({
       toast.error("Ingresa valores válidos (números >= 0)");
       return;
     }
+
+    let predictedWinner: Qualifier | undefined;
+    if (knockout) {
+      const outcome = getWinner({ homeScore: h, awayScore: a });
+      if (outcome === "draw") {
+        if (winner !== "home" && winner !== "away") {
+          toast.error("Elige el equipo clasificado para esta llave");
+          return;
+        }
+        predictedWinner = winner;
+      } else {
+        predictedWinner = outcome;
+      }
+    }
+
     setSaving(true);
     try {
-      await onSave(match.id, h, a);
+      await onSave(match.id, h, a, predictedWinner);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -99,9 +156,9 @@ function MatchPickRow({
           )}
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <span className="flex-1 text-right font-medium text-sm">{match.homeTeam}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <Input
             type="number"
             min={0}
@@ -146,6 +203,33 @@ function MatchPickRow({
           </Button>
         )}
       </div>
+      {knockout && (
+        <div className="mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 sm:flex-row sm:items-center sm:justify-end">
+          <span className="text-xs font-medium text-muted-foreground">Clasifica</span>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={effectiveWinner === "home" ? "default" : "outline"}
+              size="sm"
+              disabled={locked || !needsQualifier}
+              onClick={() => setWinner("home")}
+              className="h-8 max-w-[180px] truncate"
+            >
+              {match.homeTeam}
+            </Button>
+            <Button
+              type="button"
+              variant={effectiveWinner === "away" ? "default" : "outline"}
+              size="sm"
+              disabled={locked || !needsQualifier}
+              onClick={() => setWinner("away")}
+              className="h-8 max-w-[180px] truncate"
+            >
+              {match.awayTeam}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -165,11 +249,16 @@ export function PicksForm() {
 
   const predMap = new Map(userPredictions?.map((p) => [p.matchId, p]) ?? []);
 
-  const handleSave = async (matchId: number, home: number, away: number) => {
+  const handleSave = async (
+    matchId: number,
+    home: number,
+    away: number,
+    predictedWinner?: Qualifier
+  ) => {
     const res = await fetch("/api/predictions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matchId, predictedHome: home, predictedAway: away }),
+      body: JSON.stringify({ matchId, predictedHome: home, predictedAway: away, predictedWinner }),
     });
 
     if (!res.ok) {
@@ -202,18 +291,25 @@ export function PicksForm() {
     );
   }
 
-  const upcoming = matches.filter((m) => !m.finished);
-  const finished = matches.filter((m) => m.finished);
+  const phasesWithMatches = PHASES.map((phase) => ({
+    phase,
+    matches: matches.filter((match) => normalizePhase(match.phase) === phase),
+  })).filter(({ matches }) => matches.length > 0);
 
   return (
     <div className="space-y-6">
-      {upcoming.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Próximos partidos
-          </h2>
+      {phasesWithMatches.map(({ phase, matches }) => (
+        <section key={phase}>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              {getPhaseLabel(phase)}
+            </h2>
+            <Badge variant="outline" className="text-[10px]">
+              {matches.length} partidos
+            </Badge>
+          </div>
           <div className="space-y-2">
-            {upcoming.map((m) => (
+            {matches.map((m) => (
               <MatchPickRow
                 key={m.id}
                 match={m}
@@ -223,24 +319,7 @@ export function PicksForm() {
             ))}
           </div>
         </section>
-      )}
-      {finished.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Partidos finalizados
-          </h2>
-          <div className="space-y-2">
-            {finished.reverse().map((m) => (
-              <MatchPickRow
-                key={m.id}
-                match={m}
-                prediction={predMap.get(m.id)}
-                onSave={handleSave}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+      ))}
     </div>
   );
 }
