@@ -197,8 +197,10 @@ function MatchPickRow({
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <span className="flex-1 text-right font-medium text-sm">{match.homeTeam}</span>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+        <span className="min-w-0 truncate text-right font-medium text-sm">
+          {match.homeTeam}
+        </span>
         <div className="flex items-center justify-center gap-2">
           <Input
             type="number"
@@ -207,9 +209,10 @@ function MatchPickRow({
             value={home}
             onChange={(e) => setHome(e.target.value)}
             disabled={locked}
-            className="w-14 text-center tabular-nums"
+            className="w-12 text-center tabular-nums sm:w-14"
+            aria-label={`Goles de ${match.homeTeam}`}
           />
-          <span className="text-muted-foreground font-bold">–</span>
+          <span className="text-muted-foreground font-bold">-</span>
           <Input
             type="number"
             min={0}
@@ -217,16 +220,21 @@ function MatchPickRow({
             value={away}
             onChange={(e) => setAway(e.target.value)}
             disabled={locked}
-            className="w-14 text-center tabular-nums"
+            className="w-12 text-center tabular-nums sm:w-14"
+            aria-label={`Goles de ${match.awayTeam}`}
           />
         </div>
-        <span className="flex-1 font-medium text-sm">{match.awayTeam}</span>
-        {!locked && (
+        <span className="min-w-0 truncate text-left font-medium text-sm">
+          {match.awayTeam}
+        </span>
+      </div>
+      {!locked && (
+        <div className="mt-3 flex justify-end">
           <Button
             size="sm"
             onClick={handleSave}
             disabled={saving}
-            className="min-w-[80px]"
+            className="w-full min-w-[80px] sm:w-auto"
           >
             {saved ? (
               <>
@@ -242,8 +250,8 @@ function MatchPickRow({
               </>
             )}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
       {knockout && (
         <div className="mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 sm:flex-row sm:items-center sm:justify-end">
           <span className="text-xs font-medium text-muted-foreground">Clasifica</span>
