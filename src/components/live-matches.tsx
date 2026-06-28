@@ -25,10 +25,10 @@ interface LiveMatch {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function pointsBadgeClass(pts: number | null) {
-  if (pts === 5) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-  if (pts === 3) return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-  if (pts === 0) return "bg-red-500/10 text-red-400 border-red-500/20";
-  return "bg-muted text-muted-foreground";
+  if (pts === null) return "bg-muted text-muted-foreground";
+  if (pts >= 8) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+  if (pts > 0) return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  return "bg-red-500/10 text-red-400 border-red-500/20";
 }
 
 function LiveMatchCard({ match }: { match: LiveMatch }) {
@@ -41,7 +41,7 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
         </div>
         <div className="flex flex-col items-center min-w-[90px]">
           <span className="font-bold text-xl tabular-nums text-yellow-400">
-            {match.homeScore ?? "–"} – {match.awayScore ?? "–"}
+            {match.homeScore ?? "-"} - {match.awayScore ?? "-"}
           </span>
           <Badge className="mt-1 text-[10px] bg-yellow-500/20 text-yellow-400 border-yellow-500/40 animate-pulse">
             En juego
@@ -59,12 +59,12 @@ function LiveMatchCard({ match }: { match: LiveMatch }) {
             <div key={p.name} className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground w-20 truncate">{p.name}</span>
               <span className="tabular-nums font-medium text-foreground/80">
-                {p.predictedHome} – {p.predictedAway}
+                {p.predictedHome} - {p.predictedAway}
               </span>
               <span
                 className={`px-2 py-0.5 rounded border text-[10px] font-semibold ${pointsBadgeClass(p.points)}`}
               >
-                {p.points !== null ? `+${p.points}` : "–"}
+                {p.points !== null ? `+${p.points}` : "-"}
               </span>
             </div>
           ))}
