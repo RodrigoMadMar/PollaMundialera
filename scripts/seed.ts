@@ -118,14 +118,14 @@ async function seedDemoState() {
   const findUser = (name: string) => users.find((u) => u.name === name);
   const findMatch = (extId: number) => matches.find((m) => m.externalId === extId);
 
-  // Initial state: Benito 8pts, Charlie 8pts, Rodrigo 3pts, Daniel 0pts, MRB 0pts
+  // Initial state: Benito 8pts, Charlie 5pts, Rodrigo 3pts, Daniel 0pts, MRB 0pts
   // Match 1: Argentina 3-3 Francia (actual)
   // Match 2: Brasil 2-1 Alemania (actual)
   const demoPredictions = [
-    // Benito: 8pts (exact + draw on match1)
+    // Benito: 8pts (exact on match1 + correct winner on match2)
     { userName: "Benito", extId: 9000001, home: 3, away: 3 },
     { userName: "Benito", extId: 9000002, home: 1, away: 0 },
-    // Charlie: 8pts (exact + winner on match2)
+    // Charlie: 5pts (exact on match2)
     { userName: "Charlie", extId: 9000001, home: 1, away: 0 },
     { userName: "Charlie", extId: 9000002, home: 2, away: 1 },
     // Rodrigo: 3pts (correct draw on match1)
