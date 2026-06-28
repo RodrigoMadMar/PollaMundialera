@@ -153,7 +153,8 @@ export function calculatePredictionScore({
     actual.homeScore === predicted.homeScore &&
     actual.awayScore === predicted.awayScore;
   const correctOutcome = getOutcome(actual) === getOutcome(predicted);
-  const exactScorePoints = exactScore ? config.exactPoints : 0;
+  const exactScorePoints =
+    exactScore && (!config.knockout || correctOutcome) ? config.exactPoints : 0;
   const outcomePoints = !exactScore && correctOutcome ? config.outcomePoints : 0;
 
   return {
