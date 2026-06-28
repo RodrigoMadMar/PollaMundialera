@@ -19,7 +19,7 @@ export default async function PicksPage() {
         </h1>
         <p className="text-muted-foreground text-sm">
           Hola, <span className="font-medium text-foreground">{user.name}</span> — ingresa
-          tus pronósticos antes del inicio de cada partido.
+          tus pronósticos por fase antes del cierre de cada partido.
         </p>
       </div>
       <PicksForm />
