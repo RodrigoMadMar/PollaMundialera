@@ -2,8 +2,24 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, predictions, matches } from "@/lib/db/schema";
 import { eq, and, isNotNull } from "drizzle-orm";
+import {
+  PHASES,
+  calculatePredictionScore,
+  normalizePhase,
+  type MatchPhase,
+} from "@/lib/points";
 
 export const dynamic = "force-dynamic";
+
+interface MatchPointDetail {
+  matchId: number;
+  phase: MatchPhase;
+  homeTeam: string;
+  awayTeam: string;
+  points: number;
+  exactScorePoints: number;
+  outcomePoints: number;
+}
 
 export async function GET() {
   try {
@@ -13,10 +29,16 @@ export async function GET() {
       allUsers.map(async (user) => {
         const userPredictions = await db
           .select({
+            matchId: matches.id,
+            phase: matches.phase,
+            homeTeam: matches.homeTeam,
+            awayTeam: matches.awayTeam,
             predictedHome: predictions.predictedHome,
             predictedAway: predictions.predictedAway,
+            predictedWinner: predictions.predictedWinner,
             homeScore: matches.homeScore,
             awayScore: matches.awayScore,
+            winner: matches.winner,
             finished: matches.finished,
           })
           .from(predictions)
@@ -33,32 +55,40 @@ export async function GET() {
           );
 
         let points = 0;
+        const phasePoints = Object.fromEntries(
+          PHASES.map((phase) => [phase, 0])
+        ) as Record<MatchPhase, number>;
+        const details: MatchPointDetail[] = [];
+
         for (const p of userPredictions) {
-          const actualHome = p.homeScore!;
-          const actualAway = p.awayScore!;
-          const predHome = p.predictedHome!;
-          const predAway = p.predictedAway!;
+          const breakdown = calculatePredictionScore({
+            phase: p.phase,
+            actual: {
+              homeScore: p.homeScore!,
+              awayScore: p.awayScore!,
+              winner: p.winner,
+            },
+            predicted: {
+              homeScore: p.predictedHome!,
+              awayScore: p.predictedAway!,
+              winner: p.predictedWinner,
+            },
+          });
 
-          const exactScore = actualHome === predHome && actualAway === predAway;
-          const actualWinner =
-            actualHome > actualAway
-              ? "home"
-              : actualAway > actualHome
-              ? "away"
-              : "draw";
-          const predWinner =
-            predHome > predAway
-              ? "home"
-              : predAway > predHome
-              ? "away"
-              : "draw";
-          const correctWinner = actualWinner === predWinner;
-
-          if (exactScore) points += 5;
-          else if (correctWinner) points += 3;
+          points += breakdown.total;
+          phasePoints[breakdown.phase] += breakdown.total;
+          details.push({
+            matchId: p.matchId,
+            phase: normalizePhase(p.phase),
+            homeTeam: p.homeTeam,
+            awayTeam: p.awayTeam,
+            points: breakdown.total,
+            exactScorePoints: breakdown.exactScorePoints,
+            outcomePoints: breakdown.outcomePoints,
+          });
         }
 
-        return { id: user.id, name: user.name, points };
+        return { id: user.id, name: user.name, points, phasePoints, details };
       })
     );
 
