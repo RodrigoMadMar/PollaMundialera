@@ -43,7 +43,16 @@ interface Prediction {
 
 type Qualifier = "home" | "away";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error ?? "Error al cargar datos");
+  }
+
+  return data;
+};
 
 function getScoreWinner(home: string, away: string): Outcome | null {
   if (home === "" || away === "") return null;
@@ -235,17 +244,21 @@ function MatchPickRow({
 }
 
 export function PicksForm() {
-  const { data: matches, isLoading: loadingMatches } = useSWR<Match[]>(
-    "/api/matches",
-    fetcher
-  );
+  const {
+    data: matches,
+    error: matchesError,
+    isLoading: loadingMatches,
+  } = useSWR<Match[]>("/api/matches", fetcher);
   const {
     data: userPredictions,
+    error: predictionsError,
     isLoading: loadingPredictions,
     mutate: mutatePredictions,
   } = useSWR<Prediction[]>("/api/predictions", fetcher);
 
   const isLoading = loadingMatches || loadingPredictions;
+  const loadError = matchesError || predictionsError;
+  const matchList = Array.isArray(matches) ? matches : [];
 
   const predMap = new Map(userPredictions?.map((p) => [p.matchId, p]) ?? []);
 
@@ -281,24 +294,24 @@ export function PicksForm() {
     );
   }
 
-  if (!matches?.length) {
+  if (loadError) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground">
-          No hay partidos disponibles aún
+          {loadError.message ?? "No se pudieron cargar los pronósticos"}
         </CardContent>
       </Card>
     );
   }
 
-  const phasesWithMatches = PHASES.map((phase) => ({
+  const phaseGroups = PHASES.map((phase) => ({
     phase,
-    matches: matches.filter((match) => normalizePhase(match.phase) === phase),
-  })).filter(({ matches }) => matches.length > 0);
+    matches: matchList.filter((match) => normalizePhase(match.phase) === phase),
+  }));
 
   return (
     <div className="space-y-6">
-      {phasesWithMatches.map(({ phase, matches }) => (
+      {phaseGroups.map(({ phase, matches }) => (
         <section key={phase}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -308,16 +321,22 @@ export function PicksForm() {
               {matches.length} partidos
             </Badge>
           </div>
-          <div className="space-y-2">
-            {matches.map((m) => (
-              <MatchPickRow
-                key={m.id}
-                match={m}
-                prediction={predMap.get(m.id)}
-                onSave={handleSave}
-              />
-            ))}
-          </div>
+          {matches.length > 0 ? (
+            <div className="space-y-2">
+              {matches.map((m) => (
+                <MatchPickRow
+                  key={m.id}
+                  match={m}
+                  prediction={predMap.get(m.id)}
+                  onSave={handleSave}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border/50 bg-background/30 px-4 py-6 text-center text-sm text-muted-foreground">
+              Aún no hay partidos cargados para esta fase
+            </div>
+          )}
         </section>
       ))}
     </div>
