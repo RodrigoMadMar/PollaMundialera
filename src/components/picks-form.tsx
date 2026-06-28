@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Lock, Save, CheckCircle } from "lucide-react";
+import { Lock, Save, CheckCircle, CircleAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,34 @@ function getScoreWinner(home: string, away: string): Outcome | null {
   const awayScore = Number(away);
   if (Number.isNaN(homeScore) || Number.isNaN(awayScore)) return null;
   return getWinner({ homeScore, awayScore });
+}
+
+function getPredictionScoreWinner(prediction?: Prediction): Outcome | null {
+  if (prediction?.predictedHome == null || prediction.predictedAway == null) return null;
+  return getWinner({
+    homeScore: prediction.predictedHome,
+    awayScore: prediction.predictedAway,
+  });
+}
+
+function getQualifierLabel(match: Match, qualifier?: Outcome | null): string | null {
+  if (qualifier === "home") return match.homeTeam;
+  if (qualifier === "away") return match.awayTeam;
+  return null;
+}
+
+function isPredictionComplete(match: Match, prediction?: Prediction): boolean {
+  if (prediction?.predictedHome == null || prediction.predictedAway == null) return false;
+
+  const phase = normalizePhase(match.phase);
+  if (!isKnockoutPhase(phase)) return true;
+
+  const scoreWinner = getPredictionScoreWinner(prediction);
+  if (scoreWinner === "draw") {
+    return prediction.predictedWinner === "home" || prediction.predictedWinner === "away";
+  }
+
+  return true;
 }
 
 function getKickoffTime(match: Match): number {
@@ -138,6 +166,15 @@ function MatchPickRow({
   const needsQualifier = knockout && scoreWinner === "draw";
   const effectiveWinner =
     knockout && scoreWinner && scoreWinner !== "draw" ? scoreWinner : winner;
+  const selectedQualifierLabel = getQualifierLabel(match, effectiveWinner || null);
+  const savedScoreWinner = getPredictionScoreWinner(prediction);
+  const savedQualifier =
+    knockout && savedScoreWinner && savedScoreWinner !== "draw"
+      ? savedScoreWinner
+      : prediction?.predictedWinner;
+  const savedQualifierLabel = getQualifierLabel(match, savedQualifier ?? null);
+  const hasSavedPrediction = isPredictionComplete(match, prediction);
+  const qualifierMissing = needsQualifier && winner !== "home" && winner !== "away";
 
   const handleSave = async () => {
     const h = parseInt(home);
@@ -179,8 +216,8 @@ function MatchPickRow({
           : "border-border/50 bg-background/50"
       }`}
     >
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">
             {format(kickoff, "dd MMM · HH:mm", { locale: es })}
           </span>
@@ -188,6 +225,12 @@ function MatchPickRow({
             <Badge variant="warning" className="text-[10px] gap-1">
               <Lock className="h-2.5 w-2.5" />
               Pronóstico cerrado
+            </Badge>
+          )}
+          {hasSavedPrediction && (
+            <Badge variant="success" className="text-[10px] gap-1">
+              <CheckCircle className="h-2.5 w-2.5" />
+              Guardado
             </Badge>
           )}
           {match.finished && (
@@ -198,7 +241,7 @@ function MatchPickRow({
         </div>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-        <span className="min-w-0 truncate text-right font-medium text-sm">
+        <span className="min-w-0 truncate text-right text-sm font-medium">
           {match.homeTeam}
         </span>
         <div className="flex items-center justify-center gap-2">
@@ -212,7 +255,7 @@ function MatchPickRow({
             className="w-12 text-center tabular-nums sm:w-14"
             aria-label={`Goles de ${match.homeTeam}`}
           />
-          <span className="text-muted-foreground font-bold">-</span>
+          <span className="font-bold text-muted-foreground">-</span>
           <Input
             type="number"
             min={0}
@@ -224,7 +267,7 @@ function MatchPickRow({
             aria-label={`Goles de ${match.awayTeam}`}
           />
         </div>
-        <span className="min-w-0 truncate text-left font-medium text-sm">
+        <span className="min-w-0 truncate text-left text-sm font-medium">
           {match.awayTeam}
         </span>
       </div>
@@ -279,6 +322,31 @@ function MatchPickRow({
           </div>
         </div>
       )}
+      {qualifierMissing && !locked && (
+        <div className="mt-2 flex items-center gap-2 text-xs font-medium text-destructive">
+          <CircleAlert className="h-3.5 w-3.5" />
+          Falta elegir clasificado
+        </div>
+      )}
+      <div className="mt-3 rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        {hasSavedPrediction && prediction ? (
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Guardado: {match.homeTeam} {prediction.predictedHome} – {prediction.predictedAway} {match.awayTeam}
+            </span>
+            {knockout && savedQualifierLabel && (
+              <span className="font-medium text-foreground">Clasifica: {savedQualifierLabel}</span>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <span>Sin pronóstico guardado</span>
+            {knockout && selectedQualifierLabel && (
+              <span className="font-medium text-foreground">Clasifica: {selectedQualifierLabel}</span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -348,11 +416,15 @@ export function PicksForm() {
     const phaseMatches = sortMatchesForPhase(
       matchList.filter((match) => normalizePhase(match.phase) === phase)
     );
+    const completedPredictions = phaseMatches.filter((match) =>
+      isPredictionComplete(match, predMap.get(match.id))
+    ).length;
 
     return {
       phase,
       phaseIndex,
       matches: phaseMatches,
+      completedPredictions,
       priority: getPhasePriority(phaseMatches),
       nextMatchTime: getNextMatchTime(phaseMatches),
       lastMatchTime: getLastMatchTime(phaseMatches),
@@ -366,14 +438,14 @@ export function PicksForm() {
 
   return (
     <div className="space-y-6">
-      {phaseGroups.map(({ phase, matches }) => (
+      {phaseGroups.map(({ phase, matches, completedPredictions }) => (
         <section key={phase}>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               {getPhaseLabel(phase)}
             </h2>
             <Badge variant="outline" className="text-[10px]">
-              {matches.length} partidos
+              {completedPredictions}/{matches.length} completados
             </Badge>
           </div>
           {matches.length > 0 ? (
