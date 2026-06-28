@@ -7,14 +7,17 @@ import { Clock, CheckCircle2, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getPhaseLabel, isKnockoutPhase, type Outcome } from "@/lib/points";
 
 interface Match {
   id: number;
+  phase: string;
   homeTeam: string;
   awayTeam: string;
   kickoff: string;
   homeScore: number | null;
   awayScore: number | null;
+  winner: Outcome | null;
   status: string;
   finished: boolean;
   updatedAt: string;
@@ -24,13 +27,22 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function MatchCard({ match }: { match: Match }) {
   const kickoff = new Date(match.kickoff);
+  const winnerTeam =
+    match.winner === "home"
+      ? match.homeTeam
+      : match.winner === "away"
+      ? match.awayTeam
+      : null;
 
   return (
     <div className="flex items-center justify-between rounded-lg border border-border/50 bg-background/50 px-4 py-3 gap-3">
       <div className="flex-1 text-right">
         <span className="font-medium text-sm">{match.homeTeam}</span>
       </div>
-      <div className="flex flex-col items-center min-w-[80px]">
+      <div className="flex min-w-[96px] flex-col items-center">
+        <Badge variant="outline" className="mb-1 text-[10px]">
+          {getPhaseLabel(match.phase)}
+        </Badge>
         {match.finished && match.homeScore !== null ? (
           <span className="font-bold text-lg tabular-nums">
             {match.homeScore} – {match.awayScore}
@@ -46,6 +58,11 @@ function MatchCard({ match }: { match: Match }) {
         >
           {match.finished ? "Finalizado" : match.status}
         </Badge>
+        {match.finished && winnerTeam && isKnockoutPhase(match.phase) && (
+          <span className="mt-1 max-w-[120px] truncate text-[10px] text-muted-foreground">
+            Clasifica: {winnerTeam}
+          </span>
+        )}
       </div>
       <div className="flex-1 text-left">
         <span className="font-medium text-sm">{match.awayTeam}</span>
