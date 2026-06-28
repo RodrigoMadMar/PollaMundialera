@@ -38,6 +38,7 @@ FOOTBALL_DATA_API_KEY=tu_api_key_aqui
 npm run db:push
 # o usando el SQL directo:
 # drizzle/0000_initial.sql
+# drizzle/0001_phase_predictions.sql
 ```
 
 5. Ejecuta el seed inicial:
@@ -133,7 +134,7 @@ src/
 │   ├── auth.ts                 # Auth server-side
 │   ├── auth-client.ts          # Auth client-side (isMatchLocked)
 │   ├── football-data.ts        # API fútbol
-│   ├── points.ts               # Cálculo de puntos
+│   ├── points.ts               # Cálculo de puntos por fase
 │   └── utils.ts
 └── __tests__/
     └── points.test.ts
@@ -141,23 +142,33 @@ scripts/
 ├── seed.ts                     # Seed inicial
 └── import-predictions.ts       # Importar CSV
 drizzle/
-└── 0000_initial.sql            # SQL migración inicial
+├── 0000_initial.sql            # SQL migración inicial
+└── 0001_phase_predictions.sql  # SQL migración para fases y clasificados
 ```
 
 ---
 
 ## Sistema de puntuación
 
-| Resultado | Puntos |
-|-----------|--------|
-| Resultado exacto | 5 pts |
-| Ganador correcto (sin resultado exacto) | 3 pts |
-| Incorrecto | 0 pts |
+Los puntos son acumulativos: si un pronóstico acierta marcador exacto y ganador/clasificado, suma ambos conceptos.
+
+| Fase | Marcador exacto | Ganador / clasificado |
+|------|----------------:|----------------------:|
+| Fase de grupos | 5 pts | 3 pts |
+| Ronda de 32 | 10 pts | 6 pts |
+| Octavos de final | 14 pts | 8 pts |
+| Cuartos de final | 20 pts | 12 pts |
+| Semifinales | 28 pts | 16 pts |
+| Tercer lugar | 30 pts | 18 pts |
+| Final | 40 pts | 25 pts |
+
+En fase de grupos, un empate pronosticado correctamente cuenta como acierto de resultado general. En eliminación, el clasificado es el equipo que gana la llave incluso si avanza por penales; el marcador exacto corresponde al marcador oficial antes de penales.
 
 **Ejemplos:**
-- Pronóstico 2-1, resultado 2-1 → **5 pts**
-- Pronóstico 1-0, resultado 3-2 → **3 pts**
-- Pronóstico 0-1, resultado 2-0 → **0 pts**
+- Grupos: pronóstico 2-1, resultado 2-1 → **8 pts**
+- Grupos: pronóstico 1-0, resultado 3-2 → **3 pts**
+- Ronda de 32: pronóstico 1-1 y clasifica A, resultado 1-1 y clasifica B → **10 pts**
+- Final: pronóstico 2-0 y campeón correcto, resultado 2-0 → **65 pts**
 
 ---
 
@@ -177,10 +188,12 @@ La app usa autenticación simple por email:
 Formato esperado del CSV:
 
 ```csv
-email,external_match_id,predicted_home,predicted_away
-rodrigo.madariaga@alumni.ie.edu,12345,2,1
-jbmartinez93@hotmail.com,12345,1,0
+email,external_match_id,predicted_home,predicted_away,predicted_winner
+rodrigo.madariaga@alumni.ie.edu,12345,2,1,
+jbmartinez93@hotmail.com,12346,1,1,home
 ```
+
+`predicted_winner` es opcional para fase de grupos y para llaves con ganador claro en el marcador pronosticado. Es obligatorio cuando un pronóstico de eliminación queda empatado y se debe elegir clasificado.
 
 Ejecutar:
 
