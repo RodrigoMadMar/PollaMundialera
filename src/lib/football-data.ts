@@ -21,6 +21,7 @@ export interface APIMatch {
   id: number;
   utcDate: string;
   status: string;
+  stage?: string | null;
   homeTeam: { name: string };
   awayTeam: { name: string };
   score: {
@@ -32,9 +33,7 @@ export interface APIMatch {
   };
 }
 
-function resolveScore(score: APIMatch["score"]): { home: number | null; away: number | null } {
-  // Use the most advanced score available (penalties > extraTime > fullTime)
-  if (score.penalties?.home !== null && score.penalties?.home !== undefined) return score.penalties;
+function resolveOfficialScore(score: APIMatch["score"]): { home: number | null; away: number | null } {
   if (score.extraTime?.home !== null && score.extraTime?.home !== undefined) return score.extraTime;
   return score.fullTime;
 }
@@ -61,19 +60,13 @@ export async function getFinishedMatches(): Promise<APIMatch[]> {
 export async function syncMatches() {
   const { db } = await import("@/lib/db");
   const { matches } = await import("@/lib/db/schema");
+  const { getWinner, normalizeOutcome, normalizePhase } = await import("@/lib/points");
   const { eq } = await import("drizzle-orm");
 
-  // Fetch matches from yesterday through tomorrow to catch live/recently finished games
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const data = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?dateFrom=${yesterday}&dateTo=${tomorrow}`
-  );
-  const todayMatches: APIMatch[] = (data.matches ?? []).filter(
-    (m: APIMatch) => new Date(m.utcDate).getFullYear() >= 2026
+  const apiMatches = (await getWorldCupMatches()).filter(
+    (m) => new Date(m.utcDate).getFullYear() >= 2026
   );
 
-  // Also fetch live matches in case they started yesterday UTC
   const liveData = await fetchAPI(
     `/competitions/${COMPETITION}/matches?status=IN_PLAY,PAUSED,LIVE`
   );
@@ -81,19 +74,27 @@ export async function syncMatches() {
     (m: APIMatch) => new Date(m.utcDate).getFullYear() >= 2026
   );
 
-  // Merge, deduplicate by id
   const seen = new Set<number>();
   const toSync: APIMatch[] = [];
-  for (const m of [...todayMatches, ...liveMatches]) {
-    if (!seen.has(m.id)) { seen.add(m.id); toSync.push(m); }
+  for (const m of [...apiMatches, ...liveMatches]) {
+    if (!seen.has(m.id)) {
+      seen.add(m.id);
+      toSync.push(m);
+    }
   }
 
   for (const m of toSync) {
     const kickoff = new Date(m.utcDate);
-    const resolved = resolveScore(m.score);
+    const resolved = resolveOfficialScore(m.score);
     const homeScore = resolved.home;
     const awayScore = resolved.away;
     const finished = m.status === "FINISHED";
+    const phase = normalizePhase(m.stage);
+    const scoreWinner =
+      homeScore !== null && awayScore !== null
+        ? getWinner({ homeScore, awayScore })
+        : null;
+    const winner = normalizeOutcome(m.score.winner) ?? (finished ? scoreWinner : null);
 
     const existing = await db
       .select()
@@ -104,11 +105,13 @@ export async function syncMatches() {
     if (existing.length === 0) {
       await db.insert(matches).values({
         externalId: m.id,
+        phase,
         homeTeam: m.homeTeam.name || "TBD",
         awayTeam: m.awayTeam.name || "TBD",
         kickoff,
         homeScore: homeScore ?? null,
         awayScore: awayScore ?? null,
+        winner,
         status: m.status,
         finished,
       });
@@ -116,10 +119,12 @@ export async function syncMatches() {
       await db
         .update(matches)
         .set({
+          phase,
           homeTeam: m.homeTeam.name || "TBD",
           awayTeam: m.awayTeam.name || "TBD",
           homeScore: homeScore ?? null,
           awayScore: awayScore ?? null,
+          winner,
           status: m.status,
           finished,
           updatedAt: new Date(),
@@ -128,5 +133,5 @@ export async function syncMatches() {
     }
   }
 
-  return { synced: toSync.length };
+  return { total: apiMatches.length, synced: toSync.length };
 }
