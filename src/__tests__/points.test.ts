@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 import { calculatePoints, calculatePredictionScore, normalizePhase } from "../lib/points";
 
 describe("calculatePoints", () => {
-  it("adds exact score and winner points in group stage", () => {
-    expect(calculatePoints({ homeScore: 2, awayScore: 1 }, { homeScore: 2, awayScore: 1 })).toBe(8);
+  it("keeps group-stage exact score at 5 total points", () => {
+    expect(calculatePoints({ homeScore: 2, awayScore: 1 }, { homeScore: 2, awayScore: 1 })).toBe(5);
   });
 
-  it("adds exact score and draw points in group stage", () => {
-    expect(calculatePoints({ homeScore: 1, awayScore: 1 }, { homeScore: 1, awayScore: 1 })).toBe(8);
+  it("keeps group-stage exact draw at 5 total points", () => {
+    expect(calculatePoints({ homeScore: 1, awayScore: 1 }, { homeScore: 1, awayScore: 1 })).toBe(5);
   });
 
   it("returns 3 for correct group-stage winner only", () => {
