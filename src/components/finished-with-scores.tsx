@@ -24,8 +24,8 @@ interface FinishedMatch {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function pointsBadgeClass(pts: number) {
-  if (pts === 5) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-  if (pts === 3) return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+  if (pts >= 8) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+  if (pts > 0) return "bg-blue-500/20 text-blue-400 border-blue-500/30";
   return "bg-red-500/10 text-red-400 border-red-500/20";
 }
 
