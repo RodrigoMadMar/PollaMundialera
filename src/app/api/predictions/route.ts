@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { predictions, matches } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSessionUser, isMatchLocked } from "@/lib/auth";
+import { getWinner, isKnockoutPhase, normalizeOutcome } from "@/lib/points";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,9 @@ export async function POST(request: NextRequest) {
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-    const { matchId, predictedHome, predictedAway } = await request.json();
+    const body = await request.json();
+    const { matchId, predictedHome, predictedAway } = body;
+    const requestedWinner = normalizeOutcome(body.predictedWinner);
 
     if (
       typeof matchId !== "number" ||
@@ -38,6 +41,10 @@ export async function POST(request: NextRequest) {
       predictedAway < 0
     ) {
       return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+    }
+
+    if (body.predictedWinner && !requestedWinner) {
+      return NextResponse.json({ error: "Clasificado inválido" }, { status: 400 });
     }
 
     const [match] = await db
@@ -57,6 +64,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const knockout = isKnockoutPhase(match.phase);
+    const scoreWinner = getWinner({ homeScore: predictedHome, awayScore: predictedAway });
+    let predictedWinner: "home" | "away" | "draw" | null = null;
+
+    if (knockout) {
+      if (scoreWinner === "draw") {
+        if (!requestedWinner || requestedWinner === "draw") {
+          return NextResponse.json(
+            { error: "Debes elegir el equipo clasificado para esta llave" },
+            { status: 400 }
+          );
+        }
+        predictedWinner = requestedWinner;
+      } else {
+        predictedWinner = scoreWinner;
+      }
+    } else {
+      predictedWinner = requestedWinner;
+    }
+
     const existing = await db
       .select()
       .from(predictions)
@@ -66,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (existing.length > 0) {
       await db
         .update(predictions)
-        .set({ predictedHome, predictedAway, updatedAt: new Date() })
+        .set({ predictedHome, predictedAway, predictedWinner, updatedAt: new Date() })
         .where(and(eq(predictions.userId, user.id), eq(predictions.matchId, matchId)));
     } else {
       await db.insert(predictions).values({
@@ -74,6 +101,7 @@ export async function POST(request: NextRequest) {
         matchId,
         predictedHome,
         predictedAway,
+        predictedWinner,
       });
     }
 
