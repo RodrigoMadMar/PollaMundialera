@@ -2,7 +2,10 @@
  * Import predictions from a CSV file.
  *
  * CSV format:
- *   email,external_match_id,predicted_home,predicted_away
+ *   email,external_match_id,predicted_home,predicted_away,predicted_winner
+ *
+ * predicted_winner is optional and accepts home, away, draw, HOME_TEAM or AWAY_TEAM.
+ * It is required for knockout predictions where the predicted score is tied.
  *
  * Usage:
  *   npx tsx scripts/import-predictions.ts predictions.csv
@@ -16,6 +19,7 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as schema from "../src/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getWinner, isKnockoutPhase, normalizeOutcome } from "../src/lib/points";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -26,7 +30,7 @@ async function importPredictions(csvPath: string) {
 
   // Skip header
   const rows = lines.slice(1).map((line) => {
-    const [email, externalMatchId, predictedHome, predictedAway] = line
+    const [email, externalMatchId, predictedHome, predictedAway, predictedWinner] = line
       .split(",")
       .map((s) => s.trim());
     return {
@@ -34,6 +38,7 @@ async function importPredictions(csvPath: string) {
       externalMatchId: parseInt(externalMatchId),
       predictedHome: parseInt(predictedHome),
       predictedAway: parseInt(predictedAway),
+      predictedWinner: normalizeOutcome(predictedWinner),
     };
   });
 
@@ -69,6 +74,26 @@ async function importPredictions(csvPath: string) {
         continue;
       }
 
+      const scoreWinner = getWinner({
+        homeScore: row.predictedHome,
+        awayScore: row.predictedAway,
+      });
+      let predictedWinner: "home" | "away" | "draw" | null = row.predictedWinner;
+
+      if (isKnockoutPhase(match.phase)) {
+        if (scoreWinner === "draw") {
+          if (!predictedWinner || predictedWinner === "draw") {
+            console.warn(
+              `  ⚠ Missing qualifier for tied knockout prediction: ${user.name} — match ${match.id}`
+            );
+            skipped++;
+            continue;
+          }
+        } else {
+          predictedWinner = scoreWinner;
+        }
+      }
+
       const existing = await db
         .select()
         .from(schema.predictions)
@@ -86,6 +111,7 @@ async function importPredictions(csvPath: string) {
           .set({
             predictedHome: row.predictedHome,
             predictedAway: row.predictedAway,
+            predictedWinner,
             updatedAt: new Date(),
           })
           .where(
@@ -101,6 +127,7 @@ async function importPredictions(csvPath: string) {
           matchId: match.id,
           predictedHome: row.predictedHome,
           predictedAway: row.predictedAway,
+          predictedWinner,
         });
         console.log(`  ✓ Inserted: ${user.name} — match ${match.id}`);
       }
