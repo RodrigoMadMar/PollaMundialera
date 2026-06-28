@@ -21,6 +21,7 @@ export interface APIMatch {
   id: number;
   utcDate: string;
   status: string;
+  stage?: string | null;
   homeTeam: { name: string };
   awayTeam: { name: string };
   score: {
@@ -51,6 +52,7 @@ export async function getFinishedMatches(): Promise<APIMatch[]> {
 export async function syncMatches() {
   const { db } = await import("@/lib/db");
   const { matches } = await import("@/lib/db/schema");
+  const { getWinner, normalizeOutcome, normalizePhase } = await import("@/lib/points");
   const { eq } = await import("drizzle-orm");
 
   const apiMatches = await getWorldCupMatches();
@@ -65,6 +67,12 @@ export async function syncMatches() {
     const homeScore = m.score.fullTime.home;
     const awayScore = m.score.fullTime.away;
     const finished = m.status === "FINISHED";
+    const phase = normalizePhase(m.stage);
+    const scoreWinner =
+      homeScore !== null && awayScore !== null
+        ? getWinner({ homeScore, awayScore })
+        : null;
+    const winner = normalizeOutcome(m.score.winner) ?? (finished ? scoreWinner : null);
 
     const existing = await db
       .select()
@@ -75,11 +83,13 @@ export async function syncMatches() {
     if (existing.length === 0) {
       await db.insert(matches).values({
         externalId: m.id,
+        phase,
         homeTeam: m.homeTeam.name || "TBD",
         awayTeam: m.awayTeam.name || "TBD",
         kickoff,
         homeScore: homeScore ?? null,
         awayScore: awayScore ?? null,
+        winner,
         status: m.status,
         finished,
       });
@@ -87,10 +97,12 @@ export async function syncMatches() {
       await db
         .update(matches)
         .set({
+          phase,
           homeTeam: m.homeTeam.name || "TBD",
           awayTeam: m.awayTeam.name || "TBD",
           homeScore: homeScore ?? null,
           awayScore: awayScore ?? null,
+          winner,
           status: m.status,
           finished,
           updatedAt: new Date(),
