@@ -17,6 +17,11 @@ async function fetchAPI(path: string) {
   return res.json();
 }
 
+interface ScorePair {
+  home: number | null;
+  away: number | null;
+}
+
 export interface APIMatch {
   id: number;
   utcDate: string;
@@ -26,15 +31,46 @@ export interface APIMatch {
   awayTeam: { name: string };
   score: {
     winner: string | null;
-    fullTime: { home: number | null; away: number | null };
-    halfTime?: { home: number | null; away: number | null };
-    extraTime?: { home: number | null; away: number | null };
-    penalties?: { home: number | null; away: number | null };
+    duration?: string | null;
+    fullTime: ScorePair;
+    halfTime?: ScorePair;
+    regularTime?: ScorePair;
+    extraTime?: ScorePair;
+    penalties?: ScorePair;
   };
 }
 
-function resolveOfficialScore(score: APIMatch["score"]): { home: number | null; away: number | null } {
-  if (score.extraTime?.home !== null && score.extraTime?.home !== undefined) return score.extraTime;
+function hasScore(score?: ScorePair): score is { home: number; away: number } {
+  return score?.home !== null &&
+    score?.home !== undefined &&
+    score?.away !== null &&
+    score?.away !== undefined;
+}
+
+export function resolveOfficialScore(score: APIMatch["score"]): ScorePair {
+  const decidedByPenalties =
+    score.duration === "PENALTY_SHOOTOUT" ||
+    (hasScore(score.penalties) &&
+      (score.penalties.home > 0 || score.penalties.away > 0));
+
+  if (!decidedByPenalties) {
+    return score.fullTime;
+  }
+
+  if (hasScore(score.regularTime) && hasScore(score.extraTime)) {
+    return {
+      home: score.regularTime.home + score.extraTime.home,
+      away: score.regularTime.away + score.extraTime.away,
+    };
+  }
+
+  if (hasScore(score.fullTime) && hasScore(score.penalties)) {
+    return {
+      home: score.fullTime.home - score.penalties.home,
+      away: score.fullTime.away - score.penalties.away,
+    };
+  }
+
   return score.fullTime;
 }
 
