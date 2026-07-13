@@ -102,24 +102,16 @@ export async function syncMatches() {
   const apiMatches = (await getWorldCupMatches()).filter(
     (m) => new Date(m.utcDate).getFullYear() >= 2026
   );
-
-  const liveData = await fetchAPI(
-    `/competitions/${COMPETITION}/matches?status=IN_PLAY,PAUSED,LIVE`
+  const existingMatches = await db.select().from(matches);
+  const existingByExternalId = new Map(
+    existingMatches
+      .filter((match) => match.externalId !== null)
+      .map((match) => [match.externalId!, match])
   );
-  const liveMatches: APIMatch[] = (liveData.matches ?? []).filter(
-    (m: APIMatch) => new Date(m.utcDate).getFullYear() >= 2026
-  );
 
-  const seen = new Set<number>();
-  const toSync: APIMatch[] = [];
-  for (const m of [...apiMatches, ...liveMatches]) {
-    if (!seen.has(m.id)) {
-      seen.add(m.id);
-      toSync.push(m);
-    }
-  }
+  let changed = 0;
 
-  for (const m of toSync) {
+  for (const m of apiMatches) {
     const kickoff = new Date(m.utcDate);
     const resolved = resolveOfficialScore(m.score);
     const homeScore = resolved.home;
@@ -131,19 +123,16 @@ export async function syncMatches() {
         ? getWinner({ homeScore, awayScore })
         : null;
     const winner = normalizeOutcome(m.score.winner) ?? (finished ? scoreWinner : null);
+    const homeTeam = m.homeTeam.name || "TBD";
+    const awayTeam = m.awayTeam.name || "TBD";
+    const existing = existingByExternalId.get(m.id);
 
-    const existing = await db
-      .select()
-      .from(matches)
-      .where(eq(matches.externalId, m.id))
-      .limit(1);
-
-    if (existing.length === 0) {
+    if (!existing) {
       await db.insert(matches).values({
         externalId: m.id,
         phase,
-        homeTeam: m.homeTeam.name || "TBD",
-        awayTeam: m.awayTeam.name || "TBD",
+        homeTeam,
+        awayTeam,
         kickoff,
         homeScore: homeScore ?? null,
         awayScore: awayScore ?? null,
@@ -151,13 +140,29 @@ export async function syncMatches() {
         status: m.status,
         finished,
       });
-    } else {
+      changed += 1;
+      continue;
+    }
+
+    const matchChanged =
+      existing.phase !== phase ||
+      existing.homeTeam !== homeTeam ||
+      existing.awayTeam !== awayTeam ||
+      existing.kickoff.getTime() !== kickoff.getTime() ||
+      existing.homeScore !== homeScore ||
+      existing.awayScore !== awayScore ||
+      existing.winner !== winner ||
+      existing.status !== m.status ||
+      existing.finished !== finished;
+
+    if (matchChanged) {
       await db
         .update(matches)
         .set({
           phase,
-          homeTeam: m.homeTeam.name || "TBD",
-          awayTeam: m.awayTeam.name || "TBD",
+          homeTeam,
+          awayTeam,
+          kickoff,
           homeScore: homeScore ?? null,
           awayScore: awayScore ?? null,
           winner,
@@ -166,8 +171,9 @@ export async function syncMatches() {
           updatedAt: new Date(),
         })
         .where(eq(matches.externalId, m.id));
+      changed += 1;
     }
   }
 
-  return { total: apiMatches.length, synced: toSync.length };
+  return { total: apiMatches.length, synced: apiMatches.length, changed };
 }
