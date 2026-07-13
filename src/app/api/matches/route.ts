@@ -16,18 +16,13 @@ async function fetchVisibleMatches() {
 
 export async function GET() {
   try {
-    let allMatches = await fetchVisibleMatches();
-    const hasUpcoming = allMatches.some((match) => !match.finished);
-
-    if (!hasUpcoming) {
-      try {
-        await syncMatches();
-        allMatches = await fetchVisibleMatches();
-      } catch (syncError) {
-        console.error("Matches auto-sync error:", syncError);
-      }
+    try {
+      await syncMatches();
+    } catch (syncError) {
+      console.error("Matches auto-sync error:", syncError);
     }
 
+    const allMatches = await fetchVisibleMatches();
     return NextResponse.json(allMatches);
   } catch (error) {
     console.error("Matches error:", error);
