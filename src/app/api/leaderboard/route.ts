@@ -14,9 +14,12 @@ export const dynamic = "force-dynamic";
 interface MatchPointDetail {
   matchId: number;
   phase: MatchPhase;
+  kickoff: Date;
   homeTeam: string;
   awayTeam: string;
   points: number;
+  exactScore: boolean;
+  correctOutcome: boolean;
   exactScorePoints: number;
   outcomePoints: number;
 }
@@ -31,6 +34,7 @@ export async function GET() {
           .select({
             matchId: matches.id,
             phase: matches.phase,
+            kickoff: matches.kickoff,
             homeTeam: matches.homeTeam,
             awayTeam: matches.awayTeam,
             predictedHome: predictions.predictedHome,
@@ -80,9 +84,12 @@ export async function GET() {
           details.push({
             matchId: p.matchId,
             phase: normalizePhase(p.phase),
+            kickoff: p.kickoff,
             homeTeam: p.homeTeam,
             awayTeam: p.awayTeam,
             points: breakdown.total,
+            exactScore: breakdown.exactScore,
+            correctOutcome: breakdown.correctOutcome,
             exactScorePoints: breakdown.exactScorePoints,
             outcomePoints: breakdown.outcomePoints,
           });
