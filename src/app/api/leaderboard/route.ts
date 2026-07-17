@@ -1,18 +1,28 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, predictions, matches } from "@/lib/db/schema";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { calculatePoints, getMatchPhase } from "@/lib/points";
+import { eq, and, isNotNull, asc, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const allUsers = await db.select().from(users);
+    const allMatches = await db
+      .select({ id: matches.id })
+      .from(matches)
+      .where(sql`home_team != 'TBD' AND away_team != 'TBD'`)
+      .orderBy(asc(matches.kickoff), asc(matches.id));
+    const phaseByMatchId = new Map(
+      allMatches.map((match, index) => [match.id, getMatchPhase(index + 1)])
+    );
 
     const leaderboard = await Promise.all(
       allUsers.map(async (user) => {
         const userPredictions = await db
           .select({
+            matchId: predictions.matchId,
             predictedHome: predictions.predictedHome,
             predictedAway: predictions.predictedAway,
             homeScore: matches.homeScore,
@@ -34,28 +44,11 @@ export async function GET() {
 
         let points = 0;
         for (const p of userPredictions) {
-          const actualHome = p.homeScore!;
-          const actualAway = p.awayScore!;
-          const predHome = p.predictedHome!;
-          const predAway = p.predictedAway!;
-
-          const exactScore = actualHome === predHome && actualAway === predAway;
-          const actualWinner =
-            actualHome > actualAway
-              ? "home"
-              : actualAway > actualHome
-              ? "away"
-              : "draw";
-          const predWinner =
-            predHome > predAway
-              ? "home"
-              : predAway > predHome
-              ? "away"
-              : "draw";
-          const correctWinner = actualWinner === predWinner;
-
-          if (exactScore) points += 5;
-          else if (correctWinner) points += 3;
+          points += calculatePoints(
+            { homeScore: p.homeScore!, awayScore: p.awayScore! },
+            { homeScore: p.predictedHome!, awayScore: p.predictedAway! },
+            phaseByMatchId.get(p.matchId!) ?? "group"
+          );
         }
 
         return { id: user.id, name: user.name, points };
